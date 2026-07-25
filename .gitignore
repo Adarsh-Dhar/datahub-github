@@ -5,3 +5,4 @@ pr-guardian-demo/target/
 pr-guardian-demo/*.duckdb
 pr-guardian-demo/.user.yml
 test-pr-guardian-e2e.sh
+test-pr-guardian-full-suite.sh
