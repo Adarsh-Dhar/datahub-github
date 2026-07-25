@@ -42,7 +42,7 @@ jobs:
           DATAHUB_PLATFORM: duckdb
           DATAHUB_ENV: PROD
           DATAHUB_DATASET_PREFIX: pr_guardian_demo.main
-          SKIP_DATAHUB: true
+          SKIP_DATAHUB: false
           BASE_SHA: ${{ github.event.pull_request.base.sha || inputs.base_sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || inputs.head_sha }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
