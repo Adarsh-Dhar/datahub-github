@@ -12,6 +12,6 @@ select
     order_id,
     customer_id,
     order_status,
-    cast(order_total as decimal(12, 2)) as order_total,
+    cast(order_total as decimal(12, 2)) as total_amount,
     created_at
 from source_orders

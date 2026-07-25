@@ -4,3 +4,4 @@ pr-guardian-demo/logs/
 pr-guardian-demo/target/
 pr-guardian-demo/*.duckdb
 pr-guardian-demo/.user.yml
+.DS_Store
