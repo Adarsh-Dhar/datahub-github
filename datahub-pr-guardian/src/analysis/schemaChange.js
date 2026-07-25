@@ -110,7 +110,8 @@ function extractJoinKeys(sql) {
   
   // Simplified regex to capture join conditions
   // Match JOIN ... ON ... stopping at WHERE or end
-const joinPattern = /join\s+[\s\S]*?on\s+([^\n;]+?)(?=\s+where|\s+group|\s+order|\s+having|\s+union|\s*join|\n|$)/gi;    .map((match) => match[1].replace(/\s+/g, " ").trim().toLowerCase());
+  const joinPattern = /join\s+[\s\S]*?on\s+([^\n;]+?)(?=\s+where|\s+group|\s+order|\s+having|\s+union|\s*join|\n|$)/gi;
+  const matches = [...sql.matchAll(joinPattern)].map((match) => match[1].replace(/\s+/g, " ").trim().toLowerCase());
   
   // Debug: log what we're extracting
   console.log(`JOIN KEYS EXTRACTED: ${JSON.stringify(matches)}`);
