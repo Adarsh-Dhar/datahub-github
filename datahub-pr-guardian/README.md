@@ -43,7 +43,7 @@ the reviewed impact in DataHub.
 
    - DATAHUB_GMS_URL: the URL of your DataHub GMS service.
    - DATAHUB_TOKEN: a DataHub personal access token.
-   - GITHUB_MODELS_TOKEN: a token that can call GitHub Models.
+   - MODELS_TOKEN: a token that can call GitHub Models.
 
 4. Update the Action reference in the demo workflow from
    your-github-handle/datahub-pr-guardian to your repository owner.

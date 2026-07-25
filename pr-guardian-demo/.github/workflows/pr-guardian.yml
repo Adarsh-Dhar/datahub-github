@@ -22,7 +22,7 @@ jobs:
           datahub-gms-url: ${{ secrets.DATAHUB_GMS_URL }}
           datahub-token: ${{ secrets.DATAHUB_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          llm-token: ${{ secrets.GITHUB_MODELS_TOKEN }}
+          llm-token: ${{ secrets.MODELS_TOKEN }}
           datahub-platform: duckdb
           datahub-env: PROD
           datahub-dataset-prefix: pr_guardian_demo.main
