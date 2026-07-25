@@ -4,3 +4,5 @@ pr-guardian-demo/logs/
 pr-guardian-demo/target/
 pr-guardian-demo/*.duckdb
 pr-guardian-demo/.user.yml
+.env
+datahub-local/.env
