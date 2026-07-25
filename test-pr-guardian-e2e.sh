@@ -227,6 +227,7 @@ EOF
 esac
 
 git add -A
+git reset .env datahub-local/.env 2>/dev/null || true
 git commit -m "$COMMIT_MSG"
 git push -u origin "$BRANCH"
 
