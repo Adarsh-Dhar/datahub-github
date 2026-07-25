@@ -602,7 +602,7 @@ EOF
   echo "== Waiting for the writeback workflow to start..."
   local wb_run_id=""
   for _ in $(seq 1 30); do
-    wb_run_id="$(gh run list --workflow "writeback.yml" --json databaseId,head_branch \
+    wb_run_id="$(gh run list --workflow "writeback.yml" --json databaseId,headBranch \
       --jq ".[] | select(.headBranch == \"$branch_name\") | .databaseId" | head -n1 || true)"
     [ -n "$wb_run_id" ] && break
     sleep 5
