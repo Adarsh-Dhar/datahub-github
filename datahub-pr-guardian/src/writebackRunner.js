@@ -22,12 +22,16 @@ async function run() {
     ...guardianComment.body.matchAll(/### .*?\s([\w-]+)\s—\s(LOW|MEDIUM|HIGH) risk/g),
   ];
   for (const [, modelName, severity] of modelMatches) {
-    await writeIncidentNote(
+    const result = await writeIncidentNote(
       modelName,
       config.prNumber,
       "Severity: " + severity.toLowerCase() + ".",
     );
-    console.log("Wrote a DataHub review note for " + modelName + ".");
+    if (result?.skipped) {
+      console.log("Skipped — review note for " + modelName + " already present.");
+    } else {
+      console.log("Wrote a DataHub review note for " + modelName + ".");
+    }
   }
 }
 
