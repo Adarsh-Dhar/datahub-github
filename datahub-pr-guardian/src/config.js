@@ -3,6 +3,8 @@ module.exports = {
   datahubGmsUrl: process.env.DATAHUB_GMS_URL,
   datahubToken: process.env.DATAHUB_TOKEN,
   llmToken: process.env.LLM_TOKEN,
+  geminiApiKey: process.env.GEMINI_API_KEY,
+  allowMutations: process.env.ALLOW_DATAHUB_MUTATIONS === "true",
   prNumber: process.env.PR_NUMBER,
   repoOwner: process.env.REPO_OWNER,
   repoName: process.env.REPO_NAME,
