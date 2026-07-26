@@ -3,6 +3,8 @@ const { getDownstreamImpact } = require("./datahub/lineage");
 const { summarizeRisk } = require("./analysis/riskSummary");
 const { hasBreakingChange } = require("./analysis/schemaChange");
 const { upsertComment } = require("./github/prComment");
+const { reviewWithAgent } = require("./agent/reviewAgent");
+const config = require("./config");
 
 const SEVERITY_EMOJI = { low: "🟢", medium: "🟡", high: "🔴" };
 
@@ -101,8 +103,16 @@ async function run() {
       continue;
     }
 
-    const downstreamImpact = skipDatahub ? [] : await getDownstreamImpact(diff.modelName);
-    const assessment = await summarizeRisk(diff, downstreamImpact);
+    const agentResult = skipDatahub || !config.geminiApiKey
+      ? { severity: "medium", summary: "DataHub agent skipped for this run." }
+      : await reviewWithAgent(diff, config);
+    
+    // Fallback to old lineage/risk path if agent is skipped
+    const downstreamImpact = (skipDatahub || !config.geminiApiKey) ? [] : await getDownstreamImpact(diff.modelName);
+    const assessment = (skipDatahub || !config.geminiApiKey) 
+      ? await summarizeRisk(diff, downstreamImpact)
+      : { severity: agentResult.severity, summary: agentResult.summary };
+    
     sections.push(renderSection(diff, downstreamImpact, assessment));
   }
 

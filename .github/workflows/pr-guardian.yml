@@ -29,6 +29,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Install uv (for mcp-server-datahub)
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+        shell: bash
       - name: Install action dependencies
         run: npm install
         working-directory: datahub-pr-guardian
@@ -39,6 +42,8 @@ jobs:
           DATAHUB_TOKEN: ${{ secrets.DATAHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LLM_TOKEN: ${{ secrets.MODELS_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ALLOW_DATAHUB_MUTATIONS: "false"
           DATAHUB_PLATFORM: duckdb
           DATAHUB_ENV: PROD
           DATAHUB_DATASET_PREFIX: pr_guardian_demo.main

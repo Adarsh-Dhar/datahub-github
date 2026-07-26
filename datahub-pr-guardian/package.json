@@ -8,7 +8,9 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@octokit/rest": "^20.1.0"
+    "@octokit/rest": "^20.1.0",
+    "@google/genai": "^2.13.0",
+    "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "scripts": {
     "test": "node --test test/*.test.js"

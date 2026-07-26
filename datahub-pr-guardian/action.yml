@@ -13,6 +13,13 @@ inputs:
   llm-token:
     description: GitHub Models token used to generate the impact summary
     required: false
+  gemini-api-key:
+    description: Gemini API key for the agent-driven review
+    required: false
+  allow-datahub-mutations:
+    description: "Allow the agent to make mutation calls to DataHub (default: false)"
+    required: false
+    default: "false"
   mode:
     description: Run analyze for a PR comment or writeback after a merged PR
     required: false
@@ -50,6 +57,8 @@ runs:
         DATAHUB_ENV: ${{ inputs.datahub-env }}
         DATAHUB_DATASET_PREFIX: ${{ inputs.datahub-dataset-prefix }}
         LLM_TOKEN: ${{ inputs.llm-token }}
+        GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
+        ALLOW_DATAHUB_MUTATIONS: ${{ inputs.allow-datahub-mutations }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         REPO_OWNER: ${{ github.repository_owner }}
         REPO_NAME: ${{ github.event.repository.name }}
