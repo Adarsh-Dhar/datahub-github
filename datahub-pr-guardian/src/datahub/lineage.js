@@ -53,29 +53,29 @@ function dedupeImpactByName(assets) {
 
   for (const asset of assets) {
     const key = `${asset.type}:${canonicalAssetName(asset.name)}`;
-    const existing = byName.get(key);
 
-    if (!existing) {
-      byName.set(key, asset);
+    if (byName.has(key)) {
+      // Prefer the closest lineage edge, but retain owners recorded on either
+      // representation of the same logical asset.
+      const existing = byName.get(key);
+      const preferred = asset.degree < existing.degree ? asset : existing;
+      const other = preferred === asset ? existing : asset;
+      byName.set(key, {
+        ...preferred,
+        owners: [...new Set([...preferred.owners, ...other.owners])],
+      });
       continue;
     }
 
-    // Prefer the closest lineage edge, but retain owners recorded on either
-    // representation of the same logical asset.
-    const preferred = asset.degree < existing.degree ? asset : existing;
-    const other = preferred === asset ? existing : asset;
-    byName.set(key, {
-      ...preferred,
-      owners: [...new Set([...preferred.owners, ...other.owners])],
-    });
+    byName.set(key, asset);
   }
 
   return [...byName.values()];
 }
 
-async function getDownstreamImpact(modelName) {
-  const urn = modelNameToUrn(modelName);
-  const data = await graphqlRequest(DOWNSTREAM_QUERY, { urn });
+async function getDownstreamImpact(config, modelName) {
+  const urn = modelNameToUrn(config, modelName);
+  const data = await graphqlRequest(config, DOWNSTREAM_QUERY, { urn });
   const results = data?.searchAcrossLineage?.searchResults || [];
 
   const assets = results.map((result) => {

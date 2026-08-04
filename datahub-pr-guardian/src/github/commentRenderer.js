@@ -2,8 +2,6 @@
 // extract model names and severities from an existing Guardian comment body.
 const RISK_SECTION_PATTERN = /### .+?\s+([\w-]+)\s+—\s+(LOW|MEDIUM|HIGH) risk/g;
 
-const SEVERITY_EMOJI = { low: "🟢", medium: "🟡", high: "🔴" };
-
 function formatChangeDetails(diff) {
   const details = [];
 
@@ -22,11 +20,17 @@ function formatChangeDetails(diff) {
     const keys = [...diff.joinKeyChanges.removed, ...diff.joinKeyChanges.added].join(", ");
     details.push(`Join-key changes: ${keys}`);
   }
-  if (!details.length && diff.addedColumns.length) {
+  if (isOnlyAdditiveChange(details, diff)) {
     details.push(`Added columns: ${diff.addedColumns.join(", ")}`);
   }
 
   return details.length ? details : ["No structural change detected."];
+}
+
+// True when the diff has no breaking-change details recorded yet but does have
+// added columns — i.e. this is a purely additive, non-breaking change.
+function isOnlyAdditiveChange(details, diff) {
+  return details.length === 0 && diff.addedColumns.length > 0;
 }
 
 function formatAffectedAssets(downstreamImpact) {
@@ -40,9 +44,7 @@ function formatAffectedAssets(downstreamImpact) {
 }
 
 function renderSection(diff, downstreamImpact, assessment) {
-  const emoji = SEVERITY_EMOJI[assessment.severity] || "🟡";
-  const severityLabel = assessment.severity.toUpperCase();
-  const header = `### ${emoji} ${diff.modelName} — ${severityLabel} risk`;
+  const header = `### ${assessment.severity.emoji} ${diff.modelName} — ${assessment.severity.label} risk`;
 
   const changeLines = formatChangeDetails(diff).map((detail) => {
     const separatorIndex = detail.indexOf(": ");
@@ -62,4 +64,4 @@ function renderSection(diff, downstreamImpact, assessment) {
   ].join("\n");
 }
 
-module.exports = { RISK_SECTION_PATTERN, SEVERITY_EMOJI, formatChangeDetails, renderSection };
+module.exports = { RISK_SECTION_PATTERN, formatChangeDetails, renderSection };

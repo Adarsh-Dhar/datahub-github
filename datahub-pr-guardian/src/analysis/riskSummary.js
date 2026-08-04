@@ -1,13 +1,12 @@
-const config = require("../config");
+const { Severity } = require("../domain/severity");
 
-const VALID_SEVERITIES = new Set(["low", "medium", "high"]);
 const LLM_MODEL_ID = "openai/gpt-4o-mini";
 const GITHUB_MODELS_ENDPOINT = "https://models.github.ai/inference/chat/completions";
 
 function determineFallbackSeverity(hasStructuralBreak, hasDownstreamImpact) {
-  if (hasStructuralBreak && hasDownstreamImpact) return "high";
-  if (hasStructuralBreak) return "medium";
-  return "low";
+  if (hasStructuralBreak && hasDownstreamImpact) return new Severity("high");
+  if (hasStructuralBreak) return new Severity("medium");
+  return new Severity("low");
 }
 
 function fallbackRisk(modelDiff, downstreamImpact) {
@@ -73,7 +72,7 @@ ${formatDownstreamConsumers(downstreamImpact)}
 In 3-4 sentences, state the concrete risk, who should review it, and include a line formatted Severity: low, medium, or high.`;
 }
 
-async function summarizeRisk(modelDiff, downstreamImpact) {
+async function summarizeRisk(config, modelDiff, downstreamImpact) {
   if (!config.llmToken) return fallbackRisk(modelDiff, downstreamImpact);
 
   const response = await fetch(GITHUB_MODELS_ENDPOINT, {
@@ -97,13 +96,7 @@ async function summarizeRisk(modelDiff, downstreamImpact) {
   const summary = responseJson.choices?.[0]?.message?.content?.trim();
   if (!summary) return fallbackRisk(modelDiff, downstreamImpact);
 
-  const severityMatch = summary.match(/severity\s*:\s*(low|medium|high)/i);
-  const severity = severityMatch?.[1]?.toLowerCase();
-
-  return {
-    severity: VALID_SEVERITIES.has(severity) ? severity : "medium",
-    summary,
-  };
+  return { severity: Severity.fromText(summary), summary };
 }
 
 module.exports = {

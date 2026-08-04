@@ -27,29 +27,29 @@ const downstreamAssets = [
 test("returns high severity when structural break and downstream assets exist", () => {
   const result = fallbackRisk(structuralDiff, downstreamAssets);
 
-  assert.equal(result.severity, "high");
+  assert.equal(result.severity.toString(), "high");
 });
 
 test("returns medium severity when structural break but no downstream assets", () => {
   const result = fallbackRisk(structuralDiff, []);
 
-  assert.equal(result.severity, "medium");
+  assert.equal(result.severity.toString(), "medium");
 });
 
 test("returns low severity when no structural break", () => {
   const result = fallbackRisk(additiveDiff, []);
 
-  assert.equal(result.severity, "low");
+  assert.equal(result.severity.toString(), "low");
 });
 
 test("determineFallbackSeverity returns high when both conditions are true", () => {
-  assert.equal(determineFallbackSeverity(true, true), "high");
+  assert.equal(determineFallbackSeverity(true, true).toString(), "high");
 });
 
 test("determineFallbackSeverity returns medium when only structural break is present", () => {
-  assert.equal(determineFallbackSeverity(true, false), "medium");
+  assert.equal(determineFallbackSeverity(true, false).toString(), "medium");
 });
 
 test("determineFallbackSeverity returns low when no structural break", () => {
-  assert.equal(determineFallbackSeverity(false, false), "low");
+  assert.equal(determineFallbackSeverity(false, false).toString(), "low");
 });

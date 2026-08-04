@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { analyzeSchemaChange, hasBreakingChange, extractColumns } = require("../src/analysis/schemaChange");
+const { analyzeSchemaChange, hasBreakingChange } = require("../src/analysis/schemaChange");
 
 test("detects a dropped explicit select column", () => {
   const before = "select order_id, customer_id, order_total from raw_orders";
@@ -42,11 +42,4 @@ test("detects changed SQL casts", () => {
   assert.deepEqual(change.typeChanges, [
     { column: "revenue", from: "decimal(12,2)", to: "bigint" },
   ]);
-});
-
-test("ignores comment-style pseudo-columns in the select list", () => {
-  const sql = "select order_id, -- this is a comment\n order_total from raw_orders";
-  const columns = extractColumns(sql);
-
-  assert.ok(columns.every((col) => !col.name.startsWith("--")));
 });

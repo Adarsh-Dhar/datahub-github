@@ -1,10 +1,10 @@
-const config = require("../config");
+const { DatasetUrn } = require("../domain/datasetUrn");
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1_000;
 
-function requireDataHubConfig() {
+function requireDataHubConfig(config) {
   if (!config.datahubGmsUrl) throw new Error("DATAHUB_GMS_URL is required.");
 }
 
@@ -13,8 +13,8 @@ function retryDelayMs(attempt) {
   return Math.pow(2, attempt) * RETRY_BASE_DELAY_MS;
 }
 
-async function graphqlRequest(query, variables = {}) {
-  requireDataHubConfig();
+async function graphqlRequest(config, query, variables = {}) {
+  requireDataHubConfig(config);
 
   const endpoint = new URL("/api/graphql", config.datahubGmsUrl).toString();
   const headers = { "Content-Type": "application/json" };
@@ -61,11 +61,8 @@ async function graphqlRequest(query, variables = {}) {
   throw lastError;
 }
 
-function modelNameToUrn(modelName) {
-  const datasetName = config.datasetPrefix
-    ? `${config.datasetPrefix}.${modelName}`
-    : modelName;
-  return `urn:li:dataset:(urn:li:dataPlatform:${config.platform},${datasetName},${config.env})`;
+function modelNameToUrn(config, modelName) {
+  return DatasetUrn.forModel(modelName, config).toString();
 }
 
 module.exports = { graphqlRequest, modelNameToUrn, retryDelayMs };

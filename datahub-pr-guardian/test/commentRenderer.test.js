@@ -1,10 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {
-  formatChangeDetails,
-  renderSection,
-  SEVERITY_EMOJI,
-} = require("../src/github/commentRenderer");
+const { formatChangeDetails, renderSection } = require("../src/github/commentRenderer");
+const { Severity } = require("../src/domain/severity");
 
 const baseDiff = {
   modelName: "stg_orders",
@@ -16,9 +13,10 @@ const baseDiff = {
 };
 
 test("renders a high-risk section header with red emoji", () => {
-  const section = renderSection(baseDiff, [], { severity: "high", summary: "Risky change." });
+  const assessment = { severity: new Severity("high"), summary: "Risky change." };
+  const section = renderSection(baseDiff, [], assessment);
 
-  assert.ok(section.startsWith(`### ${SEVERITY_EMOJI.high} stg_orders — HIGH risk`));
+  assert.ok(section.startsWith(`### ${new Severity("high").emoji} stg_orders — HIGH risk`));
 });
 
 test("renders dropped columns in change details", () => {

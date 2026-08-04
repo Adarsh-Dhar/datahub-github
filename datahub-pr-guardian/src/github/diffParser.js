@@ -1,7 +1,7 @@
 const { execFileSync } = require("child_process");
 const fs = require("fs");
-const config = require("../config");
-const { analyzeSchemaChange, extractColumns } = require("../analysis/schemaChange");
+const { analyzeSchemaChange } = require("../analysis/schemaChange");
+const { extractColumns } = require("../analysis/sqlParser");
 
 function requireGitRef(name, value) {
   if (!value) throw new Error(`${name} is required to calculate the pull-request diff.`);
@@ -13,7 +13,7 @@ function modelNameFromPath(filePath) {
 }
 
 // Returns changed dbt model files between the pull request base and head commits.
-function getChangedModels() {
+function getChangedModels(config) {
   const baseSha = requireGitRef("BASE_SHA", config.baseSha);
   const headSha = requireGitRef("HEAD_SHA", config.headSha);
 
@@ -25,7 +25,7 @@ function getChangedModels() {
     .filter((file) => file.endsWith(".sql") && file.includes("models/"));
 }
 
-function diffModel(filePath) {
+function diffModel(config, filePath) {
   const headContent = fs.readFileSync(filePath, "utf8");
   const modelName = modelNameFromPath(filePath);
   let baseContent;

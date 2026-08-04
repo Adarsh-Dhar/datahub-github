@@ -1,41 +1,17 @@
 const { getChangedModels, diffModel } = require("./github/diffParser");
-const { getDownstreamImpact } = require("./datahub/lineage");
-const { summarizeRisk } = require("./analysis/riskSummary");
 const { hasBreakingChange } = require("./analysis/schemaChange");
 const { upsertComment } = require("./github/prComment");
 const { renderSection } = require("./github/commentRenderer");
-const { reviewWithAgent } = require("./agent/reviewAgent");
+const { createRiskStrategy } = require("./analysis/riskStrategy");
 const config = require("./config");
 
 const COMMENT_HEADER = "## 🛡️ DataHub PR Guardian";
 const NO_CHANGES_BODY = "✅ **DataHub PR Guardian:** no breaking schema changes detected.";
 
-// Returns { assessment, downstreamImpact } for the given diff.
-// Uses the Gemini agent when an API key is configured, otherwise falls back
-// to the DataHub lineage + LLM risk-summary path.
-async function evaluateRisk(diff) {
-  if (config.geminiApiKey) {
-    const agentResult = await reviewWithAgent(diff, config);
-    return {
-      assessment: { severity: agentResult.severity, summary: agentResult.summary },
-      downstreamImpact: [],
-    };
-  }
-
-  const downstreamImpact = config.skipDatahub
-    ? []
-    : await getDownstreamImpact(diff.modelName);
-
-  return {
-    assessment: await summarizeRisk(diff, downstreamImpact),
-    downstreamImpact,
-  };
-}
-
 // Processes a single changed SQL file and returns a rendered comment section,
 // or null if the model should be skipped.
-async function processModel(file) {
-  const diff = diffModel(file);
+async function processModel(file, riskStrategy) {
+  const diff = diffModel(config, file);
 
   if (diff.isNew) {
     console.log(`Skipping new model ${diff.modelName}; it has no existing lineage.`);
@@ -46,7 +22,7 @@ async function processModel(file) {
     return null;
   }
 
-  const { assessment, downstreamImpact } = await evaluateRisk(diff);
+  const { assessment, downstreamImpact } = await riskStrategy.evaluate(diff);
   return renderSection(diff, downstreamImpact, assessment);
 }
 
@@ -56,18 +32,20 @@ function buildCommentBody(sections) {
 }
 
 async function run() {
-  const changedFiles = getChangedModels();
+  const changedFiles = getChangedModels(config);
   if (!changedFiles.length) {
     console.log("No dbt model changes detected.");
     return;
   }
 
-  if (config.skipDatahub) {
-    console.log("Skipping DataHub lineage calls (SKIP_DATAHUB=true).");
-  }
+  const riskStrategy = createRiskStrategy(config);
+  riskStrategy.logStartupNotice();
 
-  const sections = (await Promise.all(changedFiles.map(processModel))).filter(Boolean);
-  const result = await upsertComment(buildCommentBody(sections));
+  const sections = (
+    await Promise.all(changedFiles.map((file) => processModel(file, riskStrategy)))
+  ).filter(Boolean);
+
+  const result = await upsertComment(config, buildCommentBody(sections));
   console.log(`PR Guardian comment ${result.action}.`);
 }
 

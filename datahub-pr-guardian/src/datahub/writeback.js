@@ -33,10 +33,10 @@ function appendReviewNote(existingDescription, note) {
   return `${current}\n\n${note}`;
 }
 
-async function writeIncidentNote(modelName, prNumber, summary) {
-  const urn = modelNameToUrn(modelName);
+async function writeIncidentNote(config, modelName, prNumber, summary) {
+  const urn = modelNameToUrn(config, modelName);
   const note = `[PR Guardian] Reviewed in PR #${prNumber}. ${summary}`;
-  const currentData = await graphqlRequest(CURRENT_DESCRIPTION_QUERY, { urn });
+  const currentData = await graphqlRequest(config, CURRENT_DESCRIPTION_QUERY, { urn });
   const existingDescription =
     currentData?.dataset?.editableProperties?.description ||
     currentData?.dataset?.properties?.description ||
@@ -47,7 +47,7 @@ async function writeIncidentNote(modelName, prNumber, summary) {
     return { updateDescription: false, skipped: true };
   }
 
-  const result = await graphqlRequest(WRITEBACK_MUTATION, {
+  const result = await graphqlRequest(config, WRITEBACK_MUTATION, {
     input: { resourceUrn: urn, description },
   });
   return { updateDescription: true, skipped: false, result };

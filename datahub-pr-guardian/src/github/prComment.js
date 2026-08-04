@@ -1,14 +1,13 @@
 const { Octokit } = require("@octokit/rest");
-const config = require("../config");
 
 const MARKER = "<!-- datahub-pr-guardian -->";
 
-function getClient() {
+function getOctokitClient(config) {
   if (!config.githubToken) throw new Error("GITHUB_TOKEN is required to post a PR comment.");
   return new Octokit({ auth: config.githubToken });
 }
 
-async function upsertComment(body) {
+async function upsertComment(config, body) {
   if (!config.repoOwner || !config.repoName || !config.prNumber) {
     throw new Error("REPO_OWNER, REPO_NAME, and PR_NUMBER are required to post a PR comment.");
   }
@@ -20,7 +19,7 @@ async function upsertComment(body) {
     return { action: "printed-locally", id: null };
   }
 
-  const octokit = getClient();
+  const octokit = getOctokitClient(config);
   const fullBody = `${MARKER}\n${body}`;
   const comments = await octokit.paginate(octokit.issues.listComments, {
     owner: config.repoOwner,

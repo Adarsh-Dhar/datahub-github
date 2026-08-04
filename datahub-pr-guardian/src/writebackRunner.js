@@ -24,6 +24,7 @@ async function run() {
   const modelMatches = [...guardianComment.body.matchAll(RISK_SECTION_PATTERN)];
   for (const [, modelName, severity] of modelMatches) {
     const result = await writeIncidentNote(
+      config,
       modelName,
       config.prNumber,
       `Severity: ${severity.toLowerCase()}.`,

@@ -1,9 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { mock } = require("node:test");
 
 // ---------------------------------------------------------------------------
-// Helpers to build minimal diff objects for tests
+// Minimal diff object builders
 // ---------------------------------------------------------------------------
 
 function newModelDiff(modelName) {
@@ -11,18 +10,6 @@ function newModelDiff(modelName) {
     modelName,
     isNew: true,
     droppedColumns: [],
-    renamedColumns: [],
-    typeChanges: [],
-    addedColumns: [],
-    joinKeyChanges: { removed: [], added: [] },
-  };
-}
-
-function breakingDiff(modelName) {
-  return {
-    modelName,
-    isNew: false,
-    droppedColumns: ["customer_id"],
     renamedColumns: [],
     typeChanges: [],
     addedColumns: [],
@@ -46,24 +33,15 @@ function additiveDiff(modelName) {
 // Tests
 // ---------------------------------------------------------------------------
 
-test("skips processing when no changed models are found", async (t) => {
-  // Require inside the test so mocks apply to a fresh module resolution.
+test("skips processing when no changed models are found", (t) => {
   const diffParser = require("../src/github/diffParser");
   t.mock.method(diffParser, "getChangedModels", () => []);
 
-  const prComment = require("../src/github/prComment");
-  const upsertSpy = t.mock.method(prComment, "upsertComment", async () => ({ action: "created" }));
-
-  // Re-require index to re-run run() — but index auto-runs, so we call run() manually
-  // by importing the internals. Since index.js calls run() on load, we test the helpers.
-  const { buildCommentBody } = require("../src/github/commentRenderer");
-
-  // Simulate: no changed files → sections is empty → no upsert should be triggered.
   const changedFiles = diffParser.getChangedModels();
   assert.equal(changedFiles.length, 0);
 });
 
-test("skips a model marked as new", async (t) => {
+test("skips a model marked as new", (t) => {
   const diffParser = require("../src/github/diffParser");
   t.mock.method(diffParser, "diffModel", () => newModelDiff("stg_orders"));
 
@@ -71,7 +49,7 @@ test("skips a model marked as new", async (t) => {
   assert.equal(diff.isNew, true);
 });
 
-test("skips a model with no breaking changes", async (t) => {
+test("skips a model with no breaking changes", (t) => {
   const diffParser = require("../src/github/diffParser");
   t.mock.method(diffParser, "diffModel", () => additiveDiff("dim_customers"));
 
@@ -81,11 +59,36 @@ test("skips a model with no breaking changes", async (t) => {
   assert.equal(hasBreakingChange(diff), false);
 });
 
-test("buildCommentBody returns the no-changes message when sections are empty", () => {
-  // Import the pure helper directly from commentRenderer to test body construction.
-  // commentRenderer does not export buildCommentBody — it lives in index.js.
-  // We test the observable output via the NO_CHANGES_BODY constant behavior.
-  const { renderSection, SEVERITY_EMOJI } = require("../src/github/commentRenderer");
+test("riskStrategy.evaluate is called for a breaking-change model", async (t) => {
+  const { renderSection } = require("../src/github/commentRenderer");
+
+  const stubbedStrategy = {
+    evaluate: t.mock.fn(async () => ({
+      assessment: { severity: "high", summary: "Breaking." },
+      downstreamImpact: [],
+    })),
+    logStartupNotice() {},
+  };
+
+  const diff = {
+    modelName: "stg_orders",
+    isNew: false,
+    droppedColumns: ["customer_id"],
+    renamedColumns: [],
+    typeChanges: [],
+    addedColumns: [],
+    joinKeyChanges: { removed: [], added: [] },
+  };
+
+  const { assessment, downstreamImpact } = await stubbedStrategy.evaluate(diff);
+  const section = renderSection(diff, downstreamImpact, assessment);
+
+  assert.equal(stubbedStrategy.evaluate.mock.callCount(), 1);
+});
+
+test("buildCommentBody renders the no-changes message when no sections are present", () => {
+  const { renderSection } = require("../src/github/commentRenderer");
+  const { Severity } = require("../src/domain/severity");
 
   const section = renderSection(
     {
@@ -97,8 +100,8 @@ test("buildCommentBody returns the no-changes message when sections are empty", 
       joinKeyChanges: { removed: [], added: [] },
     },
     [],
-    { severity: "high", summary: "Breaking change." },
+    { severity: new Severity("high"), summary: "Breaking change." },
   );
 
-  assert.ok(section.includes(`${SEVERITY_EMOJI.high} stg_orders — HIGH risk`));
+  assert.ok(section.includes(`${new Severity("high").emoji} stg_orders — HIGH risk`));
 });
