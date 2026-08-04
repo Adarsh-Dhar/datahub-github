@@ -7,6 +7,20 @@ function getOctokitClient(config) {
   return new Octokit({ auth: config.githubToken });
 }
 
+// Fetches all PR comments and returns the existing Guardian comment, or null.
+// Used by both upsertComment (to decide create vs update) and writebackRunner
+// (to parse model risk sections for DataHub writeback).
+async function findGuardianComment(config) {
+  const octokit = getOctokitClient(config);
+  const comments = await octokit.paginate(octokit.issues.listComments, {
+    owner: config.repoOwner,
+    repo: config.repoName,
+    issue_number: Number(config.prNumber),
+    per_page: 100,
+  });
+  return comments.find((comment) => comment.body?.includes(MARKER)) || null;
+}
+
 async function upsertComment(config, body) {
   if (!config.repoOwner || !config.repoName || !config.prNumber) {
     throw new Error("REPO_OWNER, REPO_NAME, and PR_NUMBER are required to post a PR comment.");
@@ -21,13 +35,7 @@ async function upsertComment(config, body) {
 
   const octokit = getOctokitClient(config);
   const fullBody = `${MARKER}\n${body}`;
-  const comments = await octokit.paginate(octokit.issues.listComments, {
-    owner: config.repoOwner,
-    repo: config.repoName,
-    issue_number: Number(config.prNumber),
-    per_page: 100,
-  });
-  const existing = comments.find((comment) => comment.body?.includes(MARKER));
+  const existing = await findGuardianComment(config);
 
   if (existing) {
     await octokit.issues.updateComment({
@@ -48,4 +56,4 @@ async function upsertComment(config, body) {
   return { action: "created", id: data.id };
 }
 
-module.exports = { MARKER, upsertComment };
+module.exports = { MARKER, findGuardianComment, upsertComment };
