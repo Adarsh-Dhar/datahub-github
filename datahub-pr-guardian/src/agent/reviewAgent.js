@@ -30,7 +30,7 @@ Join-key changes: ${JSON.stringify(diff.joinKeyChanges)}`;
 
   for (let turn = 0; turn < 8 && !finalResult; turn++) {
     const response = await genai.models.generateContent({
-      model: "gemini-2.5-pro",
+      model: "gemini-3.1-flash-lite",
       contents,
       config: {
         systemInstruction: systemPrompt,
