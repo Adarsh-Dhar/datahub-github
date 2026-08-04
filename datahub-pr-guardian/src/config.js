@@ -5,6 +5,7 @@ module.exports = {
   llmToken: process.env.LLM_TOKEN,
   geminiApiKey: process.env.GEMINI_API_KEY,
   allowMutations: process.env.ALLOW_DATAHUB_MUTATIONS === "true",
+  skipDatahub: process.env.SKIP_DATAHUB === "true",
   prNumber: process.env.PR_NUMBER,
   repoOwner: process.env.REPO_OWNER,
   repoName: process.env.REPO_NAME,

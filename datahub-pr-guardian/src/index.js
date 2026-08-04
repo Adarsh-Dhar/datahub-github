@@ -103,13 +103,13 @@ async function run() {
       continue;
     }
 
-    const agentResult = skipDatahub || !config.geminiApiKey
+    const agentResult = !config.geminiApiKey
       ? { severity: "medium", summary: "DataHub agent skipped for this run." }
       : await reviewWithAgent(diff, config);
     
     // Fallback to old lineage/risk path if agent is skipped
-    const downstreamImpact = (skipDatahub || !config.geminiApiKey) ? [] : await getDownstreamImpact(diff.modelName);
-    const assessment = (skipDatahub || !config.geminiApiKey) 
+    const downstreamImpact = skipDatahub || !config.geminiApiKey ? [] : await getDownstreamImpact(diff.modelName);
+    const assessment = !config.geminiApiKey 
       ? await summarizeRisk(diff, downstreamImpact)
       : { severity: agentResult.severity, summary: agentResult.summary };
     
