@@ -108,7 +108,7 @@ async function run() {
       : await reviewWithAgent(diff, config);
     
     // Fallback to old lineage/risk path if agent is skipped
-    const downstreamImpact = skipDatahub || !config.geminiApiKey ? [] : await getDownstreamImpact(diff.modelName);
+    const downstreamImpact = config.skipDatahub || !config.geminiApiKey ? [] : await getDownstreamImpact(diff.modelName);
     const assessment = !config.geminiApiKey 
       ? await summarizeRisk(diff, downstreamImpact)
       : { severity: agentResult.severity, summary: agentResult.summary };
