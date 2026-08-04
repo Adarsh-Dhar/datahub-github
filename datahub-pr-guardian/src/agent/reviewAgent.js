@@ -2,7 +2,10 @@ const { GoogleGenAI } = require("@google/genai");
 const { connectDatahubMcp } = require("./mcpClient");
 
 async function reviewWithAgent(diff, config) {
-  const { client, tools } = await connectDatahubMcp(config);
+  // Skip MCP connection if SKIP_DATAHUB is enabled
+  const { client, tools } = config.skipDatahub 
+    ? { client: null, tools: [] } 
+    : await connectDatahubMcp(config);
 
   const genai = new GoogleGenAI({ apiKey: config.geminiApiKey });
 
@@ -12,7 +15,12 @@ async function reviewWithAgent(diff, config) {
     parameters: stripUnsupportedSchemaFields(t.inputSchema),
   }));
 
-  const systemPrompt = `You are reviewing a dbt model change for breaking-change risk.
+  // If DataHub is skipped, provide a simpler prompt without tool calling
+  const effectiveSystemPrompt = config.skipDatahub
+    ? `You are reviewing a dbt model change for breaking-change risk.
+Analyze the provided changes and respond with a JSON object:
+{ "severity": "low"|"medium"|"high", "summary": "3-4 sentence explanation" }`
+    : `You are reviewing a dbt model change for breaking-change risk.
 Use the DataHub tools available to you to investigate real downstream impact —
 call get_lineage to see what depends on this model, and get_dataset_queries to see
 if the affected columns are actually used in real queries. Do not guess; call the
@@ -33,8 +41,8 @@ Join-key changes: ${JSON.stringify(diff.joinKeyChanges)}`;
       model: "gemini-3.1-flash-lite",
       contents,
       config: {
-        systemInstruction: systemPrompt,
-        tools: [{ functionDeclarations }],
+        systemInstruction: effectiveSystemPrompt,
+        tools: functionDeclarations.length > 0 ? [{ functionDeclarations }] : undefined,
       },
     });
 
@@ -59,7 +67,7 @@ Join-key changes: ${JSON.stringify(diff.joinKeyChanges)}`;
     contents.push({ role: "user", parts: responseParts });
   }
 
-  await client.close();
+  if (client) await client.close();
   return finalResult || { severity: "medium", summary: "Agent did not converge on a result; review manually." };
 }
 
