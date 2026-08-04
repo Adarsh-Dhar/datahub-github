@@ -51,15 +51,17 @@ Join-key changes: ${JSON.stringify(diff.joinKeyChanges)}`;
     const responseParts = [];
     for (const part of functionCalls) {
       const { name, args } = part.functionCall;
-      const result = await client.callTool({ name, arguments: args });
-      responseParts.push({
-        functionResponse: { name, response: { content: result.content } },
-      });
+      if (client) {
+        const result = await client.callTool({ name, arguments: args });
+        responseParts.push({
+          functionResponse: { name, response: { content: result.content } },
+        });
+      }
     }
     contents.push({ role: "user", parts: responseParts });
   }
 
-  await client.close();
+  if (client) await client.close();
   return finalResult || { severity: "medium", summary: "Agent did not converge on a result; review manually." };
 }
 
