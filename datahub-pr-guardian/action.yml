@@ -16,6 +16,10 @@ inputs:
   gemini-api-key:
     description: Gemini API key for the agent-driven review
     required: false
+  skip-datahub:
+    description: "Skip DataHub lineage calls (useful for testing without DataHub) (default: false)"
+    required: false
+    default: "false"
   allow-datahub-mutations:
     description: "Allow the agent to make mutation calls to DataHub (default: false)"
     required: false
@@ -59,6 +63,7 @@ runs:
         LLM_TOKEN: ${{ inputs.llm-token }}
         GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
         ALLOW_DATAHUB_MUTATIONS: ${{ inputs.allow-datahub-mutations }}
+        SKIP_DATAHUB: ${{ inputs.skip-datahub }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         REPO_OWNER: ${{ github.repository_owner }}
         REPO_NAME: ${{ github.event.repository.name }}

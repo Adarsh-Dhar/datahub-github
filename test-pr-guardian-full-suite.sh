@@ -95,16 +95,17 @@ fresh_branch() {
   git checkout "$DEFAULT_BRANCH"
   git pull origin "$DEFAULT_BRANCH"
   git checkout -b "$name"
-  # Reset demo files to original state
-  echo "$ORIGINAL_STAGING" > "$STAGING_FILE"
-  echo "$ORIGINAL_MARTS" > "$MARTS_FILE"
-  rm -f "$NEW_MODEL_FILE"
 }
 
 commit_push() {
   local msg="$1"
   git add -A
   git reset test-pr-guardian-full-suite.sh 2>/dev/null || true
+  if git diff --cached --quiet; then
+    echo "!! Nothing to commit — main has likely drifted from this script's hardcoded baseline." >&2
+    echo "!! Compare: git --no-pager show $DEFAULT_BRANCH:$STAGING_FILE" >&2
+    return 1
+  fi
   git commit -m "$msg"
   git push -u origin "$(git branch --show-current)"
 }
@@ -447,6 +448,16 @@ EOF
   branch_name="$(git branch --show-current)"
   gh pr merge "$pr_number" --squash --delete-branch
 
+  # Self-heal: restore main to pristine so future tests are not affected by this merge
+  git checkout "$DEFAULT_BRANCH"
+  git pull origin "$DEFAULT_BRANCH"
+  if ! diff -q <(echo "$ORIGINAL_STAGING") "$STAGING_FILE" >/dev/null 2>&1; then
+    echo "$ORIGINAL_STAGING" > "$STAGING_FILE"
+    git add "$STAGING_FILE"
+    git commit -m "chore: auto-restore stg_orders.sql baseline after writeback test"
+    git push
+  fi
+
   echo "== Waiting for the writeback workflow to start..."
   local wb_run_id=""
   for _ in $(seq 1 30); do
@@ -509,6 +520,16 @@ EOF
   branch_name="$(git branch --show-current)"
   gh pr merge "$pr_number" --squash --delete-branch
 
+  # Self-heal: restore main to pristine so future tests are not affected by this merge
+  git checkout "$DEFAULT_BRANCH"
+  git pull origin "$DEFAULT_BRANCH"
+  if ! diff -q <(echo "$ORIGINAL_STAGING") "$STAGING_FILE" >/dev/null 2>&1; then
+    echo "$ORIGINAL_STAGING" > "$STAGING_FILE"
+    git add "$STAGING_FILE"
+    git commit -m "chore: auto-restore stg_orders.sql baseline after writeback test"
+    git push
+  fi
+
   echo "== Waiting for the writeback workflow to start..."
   local wb_run_id=""
   for _ in $(seq 1 30); do
@@ -528,6 +549,93 @@ EOF
   echo "== ONE new line for PR #$pr_number, not a second copy of the earlier PR's note."
 
   git checkout "$DEFAULT_BRANCH"
+}
+
+test_writeback_same_pr_dedupe() {
+  echo "### TEST: writeback same-PR dedupe (same PR written twice should skip second write)"
+  echo "-- This tests the actual dedupe path: same PR number, writeback called twice"
+  fresh_branch "test-writeback-same-pr-dedupe-$(date +%s)"
+  cat <<'EOF' > "$STAGING_FILE"
+with source_orders as (
+    select
+        order_id,
+        customer_id,
+        order_status,
+        order_total,
+        created_at
+    from {{ source('raw', 'orders') }}
+)
+
+select
+    order_id,
+    customer_id,
+    order_status,
+    cast(order_total as decimal(12, 2)) as total_amount,
+    created_at
+from source_orders
+EOF
+  commit_push "test: rename column for same-PR dedupe test"
+
+  local pr_number head_sha run_id
+  head_sha="$(git rev-parse HEAD)"
+  pr_number="$(open_pr "Test: writeback same-PR dedupe" "Automated test. Will write to DataHub twice to test dedupe.")"
+  echo "== Opened PR #$pr_number"
+  run_id="$(wait_for_run "pr-guardian.yml" "$head_sha")"
+  watch_and_report "$run_id"
+  guardian_comment "$pr_number"
+
+  echo "== Merging PR #$pr_number"
+  local branch_name
+  branch_name="$(git branch --show-current)"
+  gh pr merge "$pr_number" --squash --delete-branch
+
+  # Self-heal: restore main to pristine so future tests are not affected by this merge
+  git checkout "$DEFAULT_BRANCH"
+  git pull origin "$DEFAULT_BRANCH"
+  if ! diff -q <(echo "$ORIGINAL_STAGING") "$STAGING_FILE" >/dev/null 2>&1; then
+    echo "$ORIGINAL_STAGING" > "$STAGING_FILE"
+    git add "$STAGING_FILE"
+    git commit -m "chore: auto-restore stg_orders.sql baseline after writeback test"
+    git push
+  fi
+
+  echo "== Waiting for the writeback workflow to start..."
+  local wb_run_id=""
+  for _ in $(seq 1 30); do
+    wb_run_id="$(gh run list --workflow "writeback.yml" --json databaseId,headBranch \
+      --jq ".[] | select(.headBranch == \"$branch_name\") | .databaseId" | head -n1 || true)"
+    [ -n "$wb_run_id" ] && break
+    sleep 5
+  done
+  watch_and_report "$wb_run_id"
+
+  if [ -n "$wb_run_id" ]; then
+    echo "== First writeback log:"
+    gh run view "$wb_run_id" --log | grep -i "DataHub review note" || echo "   (no matching log line)"
+  fi
+
+  echo "== Now manually trigger writeback AGAIN for the same PR (simulating duplicate trigger)..."
+  gh workflow run writeback.yml -f pr_number="$pr_number"
+  sleep 5
+  local wb_run_id2=""
+  for _ in $(seq 1 30); do
+    wb_run_id2="$(gh run list --workflow "writeback.yml" --json databaseId --limit 1 --jq ".[0].databaseId" || true)"
+    [ -n "$wb_run_id2" ] && [ "$wb_run_id2" != "$wb_run_id" ] && break
+    sleep 5
+  done
+
+  watch_and_report "$wb_run_id2"
+
+  if [ -n "$wb_run_id2" ]; then
+    echo "== Second writeback log (should show 'skipped' or no new note):"
+    gh run view "$wb_run_id2" --log | grep -i "DataHub review note\|skipped" || echo "   (no matching log line)"
+  fi
+
+  echo "== Confirm via GraphQL: should have exactly ONE note for PR #$pr_number"
+  echo '  curl -s -X POST "$DATAHUB_GMS_URL/api/graphql" \'
+  echo '    -H "Content-Type: application/json" -H "Authorization: Bearer $DATAHUB_TOKEN" \'
+  echo '    -d '"'"'{"query":"query { dataset(urn: \"urn:li:dataset:(urn:li:dataPlatform:duckdb,pr_guardian_demo.main.stg_orders,PROD)\") { editableProperties { description } } }"}'"'"
+  echo "== Look for: [PR Guardian] Reviewed in PR #$pr_number (should appear exactly once)"
 }
 
 test_datahub_down() {
@@ -614,6 +722,7 @@ case "$TEST" in
   llm-check)           test_llm_check ;;
   writeback)            test_writeback ;;
   writeback-dedupe)     test_writeback_dedupe ;;
+  writeback-same-pr-dedupe) test_writeback_same_pr_dedupe ;;
   datahub-down)         test_datahub_down "$@" ;;
   dispatch)             test_dispatch "$@" ;;
   all)

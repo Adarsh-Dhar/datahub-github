@@ -23,6 +23,8 @@ jobs:
           datahub-token: ${{ secrets.DATAHUB_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           llm-token: ${{ secrets.GITHUB_MODELS_TOKEN }}
+          gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
+          skip-datahub: "true"
           datahub-platform: duckdb
           datahub-env: PROD
           datahub-dataset-prefix: pr_guardian_demo.main
