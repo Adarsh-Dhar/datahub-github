@@ -3,6 +3,11 @@ const { Client } = require("@modelcontextprotocol/sdk/client/index.js");
 const { StdioClientTransport } = require("@modelcontextprotocol/sdk/client/stdio.js");
 
 async function connectDatahubMcp(config) {
+  if (config.skipDatahub) {
+    console.log("Skipping DataHub MCP connection (skipDatahub=true)");
+    return { client: null, tools: [] };
+  }
+
   const transport = new StdioClientTransport({
     command: "uvx",
     args: ["mcp-server-datahub@latest"],
