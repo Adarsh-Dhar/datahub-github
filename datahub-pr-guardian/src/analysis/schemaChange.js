@@ -1,3 +1,71 @@
+// Greedy capture after AS — the balanced-paren walker trims the outer closing paren.
+const CAST_TYPE_PATTERN = /\bcast\s*\([\s\S]*?\s+as\s+([\s\S]+)/i;
+const SHORTHAND_CAST_PATTERN = /::\s*([\s\S]+)/i;
+const ALIAS_PATTERN = /\s+as\s+([\w$]+)\s*$/i;
+
+// Walks a type string from the match position, collecting characters until
+// an unmatched closing parenthesis is encountered. This correctly handles
+// precision types like decimal(10,2) where the inner parens are part of the type.
+function extractBalancedType(expression, pattern) {
+  const match = expression.match(pattern);
+  if (!match) return null;
+
+  const typePart = match[1];
+  let depth = 0;
+  let result = "";
+
+  for (const char of typePart) {
+    if (char === "(") {
+      depth++;
+      result += char;
+    } else if (char === ")") {
+      if (depth === 0) break;
+      depth--;
+      result += char;
+    } else {
+      result += char;
+    }
+  }
+
+  return result.trim() || null;
+}
+
+function extractAlias(expression) {
+  const match = expression.match(ALIAS_PATTERN);
+  return match ? match[1].replace(/["`]/g, "") : null;
+}
+
+function extractColumnType(expression) {
+  const castType = extractBalancedType(expression, CAST_TYPE_PATTERN);
+  const shorthandType = extractBalancedType(expression, SHORTHAND_CAST_PATTERN);
+  const raw = castType || shorthandType;
+  return raw ? raw.replace(/\s+/g, " ").toLowerCase() : null;
+}
+
+function columnFromExpression(expression) {
+  // Anchoring the alias match to the end avoids mistaking CAST(... AS type) for an alias.
+  const alias = extractAlias(expression);
+  const expressionWithoutAlias = alias
+    ? expression.slice(0, expression.match(ALIAS_PATTERN).index).trim()
+    : expression.trim();
+
+  const fallbackName = expressionWithoutAlias
+    .split(".")
+    .pop()
+    .replace(/["`]/g, "")
+    .trim();
+
+  return {
+    name: (alias || fallbackName).replace(/["`]/g, ""),
+    expression: expressionWithoutAlias.replace(/\s+/g, " ").toLowerCase(),
+    type: extractColumnType(expressionWithoutAlias),
+  };
+}
+
+function isValidColumn(column) {
+  return Boolean(column.name) && !column.name.startsWith("--");
+}
+
 function splitSelectList(selectBody) {
   const items = [];
   let current = "";
@@ -26,119 +94,54 @@ function splitSelectList(selectBody) {
       current += char;
     }
   }
+
   if (current.trim()) items.push(current.trim());
   return items;
 }
 
 function extractSelectBody(sql) {
-  // Handle CTEs by finding the last SELECT before FROM
+  // Try the CTE pattern first so the final SELECT (not one inside a CTE) is matched.
   const ctePattern = /\bwith\b[\s\S]*?\)\s*\bselect\b([\s\S]*?)\bfrom\b/i;
   const normalPattern = /\bselect\b([\s\S]*?)\bfrom\b/i;
-  
-  // Try CTE pattern first, then normal pattern
   const match = sql.match(ctePattern) || sql.match(normalPattern);
   return match ? match[1] : "";
-}
-
-function columnFromExpression(expression) {
-  // Anchoring to the end avoids mistaking CAST(... AS type) for an alias.
-  const aliasMatch = expression.match(/\s+as\s+([\w$]+)\s*$/i);
-  const expressionWithoutAlias = aliasMatch
-    ? expression.slice(0, aliasMatch.index).trim()
-    : expression.trim();
-  const fallbackName = expressionWithoutAlias
-    .split(".")
-    .pop()
-    .replace(/["`]/g, "")
-    .trim();
-  const name = (aliasMatch?.[1] || fallbackName).replace(/["`]/g, "");
-  const castTypeMatch = expressionWithoutAlias.match(
-    /\bcast\s*\([\s\S]*?\s+as\s+([a-z][\w]*(?:\s*\([^)]*\))?)/i,
-  );
-  const shorthandTypeMatch = expressionWithoutAlias.match(
-    /::\s*([a-z][\w]*(?:\s*\([^)]*\))?)/i,
-  );
-
-  // Extract full type including numbers and commas for precision types like decimal(10, 2)
-  // Use a function to handle balanced parentheses properly
-  const extractCastType = (expr, pattern) => {
-    const match = expr.match(pattern);
-    if (!match) return null;
-    const typePart = match[1];
-    let depth = 0;
-    let result = "";
-    for (let i = 0; i < typePart.length; i++) {
-      const char = typePart[i];
-      if (char === "(") depth++;
-      else if (char === ")") {
-        if (depth === 0) break;
-        depth--;
-      }
-      result += char;
-    }
-    return result.trim();
-  };
-  const fullCastTypeMatch = extractCastType(
-    expressionWithoutAlias,
-    /\bcast\s*\([\s\S]*?\s+as\s+([^\)]*(?:\([^\)]*\)[^\)]*)*)/i,
-  );
-  const fullShorthandTypeMatch = extractCastType(
-    expressionWithoutAlias,
-    /::\s*([a-z][\w]*(?:\s*\([^)]*\))?)/i,
-  );
-
-  const extractedType = (fullCastTypeMatch || fullShorthandTypeMatch)
-    ? (fullCastTypeMatch || fullShorthandTypeMatch).replace(/\s+/g, " ").toLowerCase()
-    : null;
-
-  return {
-    name,
-    expression: expressionWithoutAlias.replace(/\s+/g, " ").toLowerCase(),
-    type: extractedType,
-  };
 }
 
 function extractColumns(sql) {
   return splitSelectList(extractSelectBody(sql))
     .map(columnFromExpression)
-    .filter((column) => column.name && !column.name.startsWith("--"));
+    .filter(isValidColumn);
 }
 
 function extractJoinKeys(sql) {
-  // Debug: log the SQL content being processed
-  console.log(`SQL CONTENT FOR JOIN EXTRACTION: ${sql.substring(0, 300)}...`);
-  
-  // Simplified regex to capture join conditions
-  // Match JOIN ... ON ... stopping at WHERE or end
-  const joinPattern = /join\s+[\s\S]*?on\s+([^\n;]+?)(?=\s+where|\s+group|\s+order|\s+having|\s+union|\s*join|\n|$)/gi;
-  const matches = [...sql.matchAll(joinPattern)].map((match) => match[1].replace(/\s+/g, " ").trim().toLowerCase());
-  
-  // Debug: log what we're extracting
-  console.log(`JOIN KEYS EXTRACTED: ${JSON.stringify(matches)}`);
-  
-  return matches;
+  const joinPattern =
+    /join\s+[\s\S]*?on\s+([^\n;]+?)(?=\s+where|\s+group|\s+order|\s+having|\s+union|\s*join|\n|$)/gi;
+  return [...sql.matchAll(joinPattern)].map((match) =>
+    match[1].replace(/\s+/g, " ").trim().toLowerCase(),
+  );
 }
 
 function analyzeSchemaChange(baseSql, headSql) {
   const baseColumns = extractColumns(baseSql);
   const headColumns = extractColumns(headSql);
-  const baseByName = new Map(baseColumns.map((column) => [column.name, column]));
-  const headByName = new Map(headColumns.map((column) => [column.name, column]));
+  const baseByName = new Map(baseColumns.map((col) => [col.name, col]));
+  const headByName = new Map(headColumns.map((col) => [col.name, col]));
+
   const droppedColumns = baseColumns
-    .filter((column) => !headByName.has(column.name))
-    .map((column) => column.name);
+    .filter((col) => !headByName.has(col.name))
+    .map((col) => col.name);
+
   const addedColumns = headColumns
-    .filter((column) => !baseByName.has(column.name))
-    .map((column) => column.name);
-  const renamedColumns = [];
+    .filter((col) => !baseByName.has(col.name))
+    .map((col) => col.name);
+
   const remainingAdded = new Set(addedColumns);
+  const renamedColumns = [];
 
   for (const oldName of droppedColumns) {
     const oldColumn = baseByName.get(oldName);
     const replacement = headColumns.find(
-      (column) =>
-        remainingAdded.has(column.name) &&
-        column.expression === oldColumn.expression,
+      (col) => remainingAdded.has(col.name) && col.expression === oldColumn.expression,
     );
     if (replacement) {
       renamedColumns.push({ from: oldName, to: replacement.name });
@@ -146,18 +149,16 @@ function analyzeSchemaChange(baseSql, headSql) {
     }
   }
 
-  const typeChanges = headColumns.flatMap((column) => {
-    const previous = baseByName.get(column.name);
-    if (!previous || previous.type === column.type || !previous.type || !column.type) {
+  const typeChanges = headColumns.flatMap((col) => {
+    const previous = baseByName.get(col.name);
+    if (!previous || previous.type === col.type || !previous.type || !col.type) {
       return [];
     }
-    return [{ column: column.name, from: previous.type, to: column.type }];
+    return [{ column: col.name, from: previous.type, to: col.type }];
   });
 
   const baseJoinKeys = new Set(extractJoinKeys(baseSql));
   const headJoinKeys = new Set(extractJoinKeys(headSql));
-  const removedJoinKeys = [...baseJoinKeys].filter((key) => !headJoinKeys.has(key));
-  const addedJoinKeys = [...headJoinKeys].filter((key) => !baseJoinKeys.has(key));
 
   return {
     droppedColumns: droppedColumns.filter(
@@ -166,7 +167,10 @@ function analyzeSchemaChange(baseSql, headSql) {
     addedColumns: addedColumns.filter((name) => remainingAdded.has(name)),
     renamedColumns,
     typeChanges,
-    joinKeyChanges: { removed: removedJoinKeys, added: addedJoinKeys },
+    joinKeyChanges: {
+      removed: [...baseJoinKeys].filter((key) => !headJoinKeys.has(key)),
+      added: [...headJoinKeys].filter((key) => !baseJoinKeys.has(key)),
+    },
   };
 }
 

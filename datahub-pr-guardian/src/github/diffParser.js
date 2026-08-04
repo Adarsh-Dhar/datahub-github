@@ -4,20 +4,20 @@ const config = require("../config");
 const { analyzeSchemaChange, extractColumns } = require("../analysis/schemaChange");
 
 function requireGitRef(name, value) {
-  if (!value) throw new Error(name + " is required to calculate the pull-request diff.");
+  if (!value) throw new Error(`${name} is required to calculate the pull-request diff.`);
   return value;
+}
+
+function modelNameFromPath(filePath) {
+  return filePath.split("/").pop().replace(/\.sql$/, "");
 }
 
 // Returns changed dbt model files between the pull request base and head commits.
 function getChangedModels() {
   const baseSha = requireGitRef("BASE_SHA", config.baseSha);
   const headSha = requireGitRef("HEAD_SHA", config.headSha);
-  const diffOutput = execFileSync("git", [
-    "diff",
-    "--name-only",
-    baseSha,
-    headSha,
-  ]).toString();
+
+  const diffOutput = execFileSync("git", ["diff", "--name-only", baseSha, headSha]).toString();
 
   return diffOutput
     .split("\n")
@@ -27,16 +27,18 @@ function getChangedModels() {
 
 function diffModel(filePath) {
   const headContent = fs.readFileSync(filePath, "utf8");
+  const modelName = modelNameFromPath(filePath);
   let baseContent;
+
   try {
     baseContent = execFileSync("git", [
       "show",
-      requireGitRef("BASE_SHA", config.baseSha) + ":" + filePath,
+      `${requireGitRef("BASE_SHA", config.baseSha)}:${filePath}`,
     ]).toString();
   } catch {
     return {
       modelPath: filePath,
-      modelName: filePath.split("/").pop().replace(/\.sql$/, ""),
+      modelName,
       isNew: true,
       ...analyzeSchemaChange("", headContent),
       addedColumns: extractColumns(headContent).map((column) => column.name),
@@ -45,7 +47,7 @@ function diffModel(filePath) {
 
   return {
     modelPath: filePath,
-    modelName: filePath.split("/").pop().replace(/\.sql$/, ""),
+    modelName,
     isNew: false,
     baseSql: baseContent,
     headSql: headContent,

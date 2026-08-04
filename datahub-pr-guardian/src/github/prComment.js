@@ -15,13 +15,13 @@ async function upsertComment(body) {
 
   if (!config.githubToken) {
     console.log("--- PR Guardian Comment (local, no GITHUB_TOKEN) ---");
-    console.log(MARKER + "\n" + body);
+    console.log(`${MARKER}\n${body}`);
     console.log("--- end ---");
     return { action: "printed-locally", id: null };
   }
 
   const octokit = getClient();
-  const fullBody = MARKER + "\n" + body;
+  const fullBody = `${MARKER}\n${body}`;
   const comments = await octokit.paginate(octokit.issues.listComments, {
     owner: config.repoOwner,
     repo: config.repoName,

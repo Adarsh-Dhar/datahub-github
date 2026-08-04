@@ -1,36 +1,36 @@
 const { graphqlRequest, modelNameToUrn } = require("./client");
 
-const DOWNSTREAM_QUERY = [
-  "query GetDownstream($urn: String!) {",
-  "  searchAcrossLineage(",
-  "    input: {",
-  "      urn: $urn",
-  "      query: \"*\"",
-  "      count: 50",
-  "      start: 0",
-  "      direction: DOWNSTREAM",
-  "      orFilters: [{ and: [{ field: \"degree\", condition: EQUAL, values: [\"1\", \"2\"] }] }]",
-  "    }",
-  "  ) {",
-  "    searchResults {",
-  "      degree",
-  "      entity {",
-  "        urn",
-  "        type",
-  "        ... on Dataset {",
-  "          name",
-  "          ownership { owners { owner { ... on CorpUser { username properties { email } } } } }",
-  "        }",
-  "        ... on Dashboard {",
-  "          dashboardId",
-  "          tool",
-  "          ownership { owners { owner { ... on CorpUser { username properties { email } } } } }",
-  "        }",
-  "      }",
-  "    }",
-  "  }",
-  "}",
-].join("\n");
+const DOWNSTREAM_QUERY = `
+  query GetDownstream($urn: String!) {
+    searchAcrossLineage(
+      input: {
+        urn: $urn
+        query: "*"
+        count: 50
+        start: 0
+        direction: DOWNSTREAM
+        orFilters: [{ and: [{ field: "degree", condition: EQUAL, values: ["1", "2"] }] }]
+      }
+    ) {
+      searchResults {
+        degree
+        entity {
+          urn
+          type
+          ... on Dataset {
+            name
+            ownership { owners { owner { ... on CorpUser { username properties { email } } } } }
+          }
+          ... on Dashboard {
+            dashboardId
+            tool
+            ownership { owners { owner { ... on CorpUser { username properties { email } } } } }
+          }
+        }
+      }
+    }
+  }
+`.trim();
 
 function ownerNames(entity) {
   return (entity.ownership?.owners || [])
@@ -52,7 +52,7 @@ function dedupeImpactByName(assets) {
   const byName = new Map();
 
   for (const asset of assets) {
-    const key = asset.type + ":" + canonicalAssetName(asset.name);
+    const key = `${asset.type}:${canonicalAssetName(asset.name)}`;
     const existing = byName.get(key);
 
     if (!existing) {

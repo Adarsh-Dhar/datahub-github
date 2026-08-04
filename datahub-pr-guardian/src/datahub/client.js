@@ -1,64 +1,71 @@
 const config = require("../config");
 
+const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 1_000;
+
 function requireDataHubConfig() {
   if (!config.datahubGmsUrl) throw new Error("DATAHUB_GMS_URL is required.");
 }
 
-async function graphqlRequest(query, variables = {}, retries = 3) {
+// Returns the milliseconds to wait before retry attempt N (exponential backoff).
+function retryDelayMs(attempt) {
+  return Math.pow(2, attempt) * RETRY_BASE_DELAY_MS;
+}
+
+async function graphqlRequest(query, variables = {}) {
   requireDataHubConfig();
+
   const endpoint = new URL("/api/graphql", config.datahubGmsUrl).toString();
   const headers = { "Content-Type": "application/json" };
-  if (config.datahubToken) headers.Authorization = "Bearer " + config.datahubToken;
-  
+  if (config.datahubToken) headers.Authorization = `Bearer ${config.datahubToken}`;
+
   let lastError;
-  for (let attempt = 0; attempt < retries; attempt++) {
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       const response = await fetch(endpoint, {
         method: "POST",
         headers,
         body: JSON.stringify({ query, variables }),
-        signal: AbortSignal.timeout(30000), // 30 second timeout
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
-      const json = await response.json().catch(() => ({}));
+
+      const responseJson = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(
-          "DataHub GraphQL request failed (" +
-            response.status +
-            "): " +
-            (json.message || JSON.stringify(json)),
+          `DataHub GraphQL request failed (${response.status}): ` +
+            `${responseJson.message || JSON.stringify(responseJson)}`,
         );
       }
-      if (json.errors?.length) {
-        throw new Error("DataHub GraphQL error: " + JSON.stringify(json.errors));
+      if (responseJson.errors?.length) {
+        throw new Error(`DataHub GraphQL error: ${JSON.stringify(responseJson.errors)}`);
       }
-      return json.data;
+
+      return responseJson.data;
     } catch (error) {
       lastError = error;
-      if (attempt < retries - 1) {
-        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 1s, 2s, 4s
-        console.warn(`GraphQL request failed (attempt ${attempt + 1}/${retries}), retrying in ${delay}ms: ${error.message}`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+      const isLastAttempt = attempt === MAX_RETRIES - 1;
+      if (!isLastAttempt) {
+        const delay = retryDelayMs(attempt);
+        console.warn(
+          `GraphQL request failed (attempt ${attempt + 1}/${MAX_RETRIES}), ` +
+            `retrying in ${delay}ms: ${error.message}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }
-  
+
   throw lastError;
 }
 
 function modelNameToUrn(modelName) {
   const datasetName = config.datasetPrefix
-    ? config.datasetPrefix + "." + modelName
+    ? `${config.datasetPrefix}.${modelName}`
     : modelName;
-  return (
-    "urn:li:dataset:(urn:li:dataPlatform:" +
-    config.platform +
-    "," +
-    datasetName +
-    "," +
-    config.env +
-    ")"
-  );
+  return `urn:li:dataset:(urn:li:dataPlatform:${config.platform},${datasetName},${config.env})`;
 }
 
-module.exports = { graphqlRequest, modelNameToUrn };
+module.exports = { graphqlRequest, modelNameToUrn, retryDelayMs };
