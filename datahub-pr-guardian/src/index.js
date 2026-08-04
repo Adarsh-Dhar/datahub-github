@@ -8,7 +8,7 @@ const config = require("./config");
 const COMMENT_HEADER = "## 🛡️ DataHub PR Guardian";
 const NO_CHANGES_BODY = "✅ **DataHub PR Guardian:** no breaking schema changes detected.";
 
-// Processes a single changed SQL file and returns a rendered comment section,
+// Processes a single changed SQL/DAG file and returns a rendered comment section,
 // or null if the model should be skipped.
 async function processModel(file, riskStrategy) {
   const diff = diffModel(config, file);
@@ -22,8 +22,8 @@ async function processModel(file, riskStrategy) {
     return null;
   }
 
-  const { assessment, downstreamImpact } = await riskStrategy.evaluate(diff);
-  return renderSection(diff, downstreamImpact, assessment);
+  const { assessment, downstreamImpact, schemaProblems, contractViolations, deprecationFlags } = await riskStrategy.evaluate(diff);
+  return renderSection(diff, downstreamImpact, assessment, { schemaProblems, contractViolations, deprecationFlags });
 }
 
 function buildCommentBody(sections) {
@@ -34,7 +34,7 @@ function buildCommentBody(sections) {
 async function run() {
   const changedFiles = getChangedModels(config);
   if (!changedFiles.length) {
-    console.log("No dbt model changes detected.");
+    console.log("No dbt model or DAG changes detected.");
     return;
   }
 

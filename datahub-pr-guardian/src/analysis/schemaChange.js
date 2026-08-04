@@ -59,7 +59,9 @@ function hasBreakingChange(change) {
       change.renamedColumns.length ||
       change.typeChanges.length ||
       change.joinKeyChanges.removed.length ||
-      change.joinKeyChanges.added.length,
+      change.joinKeyChanges.added.length ||
+      (change.removedTables && change.removedTables.length) ||
+      (change.addedTables && change.addedTables.length),
   );
 }
 

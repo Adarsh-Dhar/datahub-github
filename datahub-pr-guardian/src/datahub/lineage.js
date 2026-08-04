@@ -19,6 +19,7 @@ const DOWNSTREAM_QUERY = `
           type
           ... on Dataset {
             name
+            deprecation { deprecated note decommissionTime }
             ownership { owners { owner { ... on CorpUser { username properties { email } } } } }
           }
           ... on Dashboard {
@@ -86,6 +87,7 @@ async function getDownstreamImpact(config, modelName) {
       name: entity.name || entity.dashboardId || entity.urn,
       degree: result.degree,
       owners: ownerNames(entity),
+      deprecation: entity.deprecation,
     };
   });
 

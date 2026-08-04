@@ -66,6 +66,9 @@ test("riskStrategy.evaluate is called for a breaking-change model", async (t) =>
     evaluate: t.mock.fn(async () => ({
       assessment: { severity: "high", summary: "Breaking." },
       downstreamImpact: [],
+      schemaProblems: [],
+      contractViolations: { violations: [], typeViolations: [] },
+      deprecationFlags: [],
     })),
     logStartupNotice() {},
   };
@@ -80,8 +83,8 @@ test("riskStrategy.evaluate is called for a breaking-change model", async (t) =>
     joinKeyChanges: { removed: [], added: [] },
   };
 
-  const { assessment, downstreamImpact } = await stubbedStrategy.evaluate(diff);
-  const section = renderSection(diff, downstreamImpact, assessment);
+  const { assessment, downstreamImpact, schemaProblems, contractViolations, deprecationFlags } = await stubbedStrategy.evaluate(diff);
+  const section = renderSection(diff, downstreamImpact, assessment, { schemaProblems, contractViolations, deprecationFlags });
 
   assert.equal(stubbedStrategy.evaluate.mock.callCount(), 1);
 });

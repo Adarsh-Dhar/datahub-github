@@ -121,4 +121,9 @@ function extractJoinKeys(sql) {
   );
 }
 
-module.exports = { extractColumns, extractJoinKeys };
+function extractSourceTables(sql) {
+  const pattern = /\b(?:from|join)\s+([\w.$]+)(?:\s+(?:as\s+)?([\w$]+))?/gi;
+  return [...sql.matchAll(pattern)].map((m) => ({ table: m[1], alias: m[2] || m[1] }));
+}
+
+module.exports = { extractColumns, extractJoinKeys, extractSourceTables };

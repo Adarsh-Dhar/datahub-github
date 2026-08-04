@@ -11,8 +11,9 @@ const AGENT_FALLBACK = {
 const REVIEW_SYSTEM_PROMPT = `You are reviewing a dbt model change for breaking-change risk.
 Use the DataHub tools available to you to investigate real downstream impact —
 call get_lineage to see what depends on this model, and get_dataset_queries to see
-if the affected columns are actually used in real queries. Do not guess; call the
-tools. When you are done investigating, respond with a JSON object:
+if the affected columns are actually used in real queries. Also validate that any
+referenced upstream columns actually exist by checking the source table schemas.
+Do not guess; call the tools. When you are done investigating, respond with a JSON object:
 { "severity": "low"|"medium"|"high", "summary": "3-4 sentence explanation" }`;
 
 // Removes schema fields that the Gemini function-calling API does not accept.
@@ -28,11 +29,31 @@ function toGeminiSchema(schema) {
 }
 
 function buildReviewPrompt(diff) {
-  return `Model: ${diff.modelName}
-Dropped columns: ${JSON.stringify(diff.droppedColumns)}
-Renamed columns: ${JSON.stringify(diff.renamedColumns)}
-Type changes: ${JSON.stringify(diff.typeChanges)}
-Join-key changes: ${JSON.stringify(diff.joinKeyChanges)}`;
+  const parts = [`Model: ${diff.modelName}`];
+  
+  // Handle DAG-specific changes
+  if (diff.removedTables) {
+    parts.push(`Removed tables: ${JSON.stringify(diff.removedTables)}`);
+  }
+  if (diff.addedTables) {
+    parts.push(`Added tables: ${JSON.stringify(diff.addedTables)}`);
+  }
+  
+  // Handle SQL-specific changes
+  if (diff.droppedColumns) {
+    parts.push(`Dropped columns: ${JSON.stringify(diff.droppedColumns)}`);
+  }
+  if (diff.renamedColumns) {
+    parts.push(`Renamed columns: ${JSON.stringify(diff.renamedColumns)}`);
+  }
+  if (diff.typeChanges) {
+    parts.push(`Type changes: ${JSON.stringify(diff.typeChanges)}`);
+  }
+  if (diff.joinKeyChanges) {
+    parts.push(`Join-key changes: ${JSON.stringify(diff.joinKeyChanges)}`);
+  }
+  
+  return parts.join("\n");
 }
 
 function parseAgentResult(text) {

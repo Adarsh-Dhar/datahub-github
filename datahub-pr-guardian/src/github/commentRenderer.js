@@ -20,6 +20,12 @@ function formatChangeDetails(diff) {
     const keys = [...diff.joinKeyChanges.removed, ...diff.joinKeyChanges.added].join(", ");
     details.push(`Join-key changes: ${keys}`);
   }
+  if (diff.removedTables && diff.removedTables.length) {
+    details.push(`Removed tables: ${diff.removedTables.join(", ")}`);
+  }
+  if (diff.addedTables && diff.addedTables.length) {
+    details.push(`Added tables: ${diff.addedTables.join(", ")}`);
+  }
   if (isOnlyAdditiveChange(details, diff)) {
     details.push(`Added columns: ${diff.addedColumns.join(", ")}`);
   }
@@ -43,8 +49,11 @@ function formatAffectedAssets(downstreamImpact) {
     .join("\n");
 }
 
-function renderSection(diff, downstreamImpact, assessment) {
-  const header = `### ${assessment.severity.emoji} ${diff.modelName} — ${assessment.severity.label} risk`;
+function renderSection(diff, downstreamImpact, assessment, validationResults = {}) {
+  const severity = assessment.severity;
+  const emoji = typeof severity === 'object' ? severity.emoji : (severity === "high" ? "🔴" : severity === "medium" ? "🟡" : "🟢");
+  const label = typeof severity === 'object' ? severity.label : severity.toUpperCase();
+  const header = `### ${emoji} ${diff.modelName} — ${label} risk`;
 
   const changeLines = formatChangeDetails(diff).map((detail) => {
     const separatorIndex = detail.indexOf(": ");
@@ -53,15 +62,45 @@ function renderSection(diff, downstreamImpact, assessment) {
     return `**${label}:** ${value}`;
   });
 
-  return [
+  const additionalLines = [];
+  
+  // Add schema validation problems
+  if (validationResults.schemaProblems?.length) {
+    additionalLines.push("**⚠️ Schema validation issues:**");
+    validationResults.schemaProblems.forEach(problem => {
+      additionalLines.push(`- ${problem}`);
+    });
+  }
+  
+  // Add contract violations
+  if (validationResults.contractViolations?.violations?.length) {
+    additionalLines.push("**⚠️ Data contract violations:**");
+    additionalLines.push(`- Breaks enforced data contract on: ${validationResults.contractViolations.violations.join(", ")}`);
+  }
+  
+  // Add deprecation warnings
+  if (validationResults.deprecationFlags?.length) {
+    additionalLines.push("**🚫 Deprecation warnings:**");
+    validationResults.deprecationFlags.forEach(flag => {
+      additionalLines.push(`- ${flag.asset}${flag.note ? ` (${flag.note})` : ""} is marked deprecated`);
+    });
+  }
+
+  const parts = [
     header,
     "",
     ...changeLines,
     `**Downstream assets affected:** ${downstreamImpact.length}`,
     formatAffectedAssets(downstreamImpact),
-    "",
-    assessment.summary,
-  ].join("\n");
+  ];
+  
+  if (additionalLines.length) {
+    parts.push("", ...additionalLines);
+  }
+  
+  parts.push("", assessment.summary);
+
+  return parts.join("\n");
 }
 
 module.exports = { RISK_SECTION_PATTERN, formatChangeDetails, renderSection };
