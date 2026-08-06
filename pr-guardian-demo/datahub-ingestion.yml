@@ -12,4 +12,5 @@ source:
 sink:
   type: datahub-rest
   config:
-    server: http://localhost:8080
+    server: https://7b9c-210-212-2-133.ngrok-free.app
+    token: eyJhbGciOiJIUzI1NiJ9.eyJhY3RvclR5cGUiOiJVU0VSIiwiYWN0b3JJZCI6ImRhdGFodWIiLCJ0eXBlIjoiUEVSU09OQUwiLCJ2ZXJzaW9uIjoiMiIsImp0aSI6ImE4OGJhMTBiLTFkMTYtNDEyZS05N2U3LWQyYTdmOTIzZWFkOSIsInN1YiI6ImRhdGFodWIiLCJleHAiOjE3ODg1OTg0OTUsImlzcyI6ImRhdGFodWItbWV0YWRhdGEtc2VydmljZSJ9.y4HCx7q6Kxnm1Ag8pectQwWSv-t_cII7jXbsXW70lM4

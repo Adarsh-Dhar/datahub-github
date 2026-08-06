@@ -23,3 +23,4 @@ jobs:
           datahub-platform: duckdb
           datahub-env: PROD
           datahub-dataset-prefix: pr_guardian_demo.main
+          allow-datahub-mutations: true

@@ -50,6 +50,17 @@ runs:
       shell: bash
       working-directory: ${{ github.action_path }}
       run: npm install --no-audit --no-fund
+    - name: Set up Python for agent mode
+      if: inputs.gemini-api-key != ''
+      shell: bash
+      run: |
+        python3 --version || (echo "Python 3 not found" && exit 1)
+    - name: Install uv for agent mode
+      if: inputs.gemini-api-key != ''
+      shell: bash
+      run: |
+        pip install uv --break-system-packages || pip3 install uv --break-system-packages
+        uvx --version || (echo "uvx not available after uv installation" && exit 1)
     - name: Run PR Guardian
       shell: bash
       working-directory: ${{ github.workspace }}

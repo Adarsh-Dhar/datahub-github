@@ -17,14 +17,14 @@ jobs:
         with:
           fetch-depth: 0
       # The Action lives in a subdirectory of this public repository.
-      - uses: Adarsh-Dhar/datadog-github/datahub-pr-guardian@main
+      - uses: Adarsh-Dhar/datahub-pr-guardian@main
         with:
           datahub-gms-url: ${{ secrets.DATAHUB_GMS_URL }}
           datahub-token: ${{ secrets.DATAHUB_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           llm-token: ${{ secrets.GITHUB_MODELS_TOKEN }}
           gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
-          skip-datahub: "true"
+          skip-datahub: "false"
           datahub-platform: duckdb
           datahub-env: PROD
           datahub-dataset-prefix: pr_guardian_demo.main
